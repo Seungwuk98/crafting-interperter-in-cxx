@@ -24,6 +24,11 @@ bool StmtInterpreter::operator()(const PrintStmt &printStmt) {
   return true;
 }
 
+bool StmtInterpreter::operator()(const VarStmt &varStmt) {
+  /// TODO
+  return false;
+}
+
 std::size_t StmtInterpreter::getError() const {
   return error + ExprEvaluator.getError();
 }
@@ -168,6 +173,10 @@ opt<uptr<Value>> ExprInterpreter::operator()(const LiteralE &literalE) {
   default:
     llvm_unreachable("All of literal is handled");
   }
+}
+
+opt<uptr<Value>> ExprInterpreter::operator()(const VarE &varE) {
+  return {}; /// TODO
 }
 
 void ExprInterpreter::report(const SMLoc loc, const SourceMgr::DiagKind kind,

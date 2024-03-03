@@ -45,6 +45,7 @@ struct ExprPrinter : PrinterBase<ExprPrinter> {
   void operator()(const UnaryE &unaryE);
   void operator()(const GroupingE &groupingE);
   void operator()(const LiteralE &literalE);
+  void operator()(const VarE &varE);
 
   void clear();
 

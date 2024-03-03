@@ -17,13 +17,17 @@ void ExprPrinter::operator()(const lox::BinaryE &binaryE) {
 }
 
 void ExprPrinter::operator()(const lox::LiteralE &literalE) {
-  auto opTok = literalE.getValue();
-  if (opTok->Kind == TokenKind::Tok_string)
+  if (const auto opTok = literalE.getValue();
+      opTok->Kind == TokenKind::Tok_string)
     ss << '"' << opTok->Symbol << '"';
   else if (opTok->Kind == TokenKind::Tok_number)
     ss << opTok->Symbol;
   else
     llvm_unreachable("In lox, there are only string and number literal");
+}
+
+void ExprPrinter::operator()(const VarE &varE) {
+  ss << varE.getSymbol()->Symbol;
 }
 
 void StmtPrinter::operator()(const ExprStmt &exprStmt) {

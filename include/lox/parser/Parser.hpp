@@ -17,10 +17,11 @@ public:
 
   SourceMgr &SrcMgr;
 
+  /// program -> declaration* EOF
   Program Parse();
 
-  /// Statement -> expression statement | print statement
-  uptr<Stmt> Statement();
+  /// declaration -> varDecl | statement
+  uptr<Stmt> Declaration();
 
   /// expression -> equality
   uptr<Expr> Expression();
@@ -28,6 +29,12 @@ public:
   [[nodiscard]] std::size_t getError() const { return errorNum; }
 
 private:
+  /// varDecl -> "var" IDENTIFIER ( "=" expression )? ";"
+  uptr<Stmt> varDeclaration();
+
+  /// Statement -> expression statement | print statement
+  uptr<Stmt> statement();
+
   /// expression statement -> expression ';'
   uptr<Stmt> exprStmt();
 

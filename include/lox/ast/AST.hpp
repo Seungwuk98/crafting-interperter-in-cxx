@@ -14,8 +14,9 @@ class BinaryE;
 class UnaryE;
 class GroupingE;
 class LiteralE;
+class VarE;
 
-using Expr = std::variant<BinaryE, UnaryE, GroupingE, LiteralE>;
+using Expr = std::variant<BinaryE, UnaryE, GroupingE, LiteralE, VarE>;
 
 template <typename ConcreteType>
 class ASTBase {
@@ -81,6 +82,15 @@ private:
   Token *value;
 };
 
+class VarE : public ASTBase<VarE> {
+public:
+  VarE(const SMLoc loc, Token *symbol) : ASTBase(loc), symbol(symbol) {}
+  [[nodiscard]] Token *getSymbol() const { return symbol; }
+
+private:
+  Token *symbol;
+};
+
 inline SMLoc getLoc(const Expr &expr) {
   if (auto *unaryE = std::get_if<UnaryE>(&expr))
     return unaryE->getLoc();
@@ -90,6 +100,8 @@ inline SMLoc getLoc(const Expr &expr) {
     return groupingE->getLoc();
   if (auto *literalE = std::get_if<LiteralE>(&expr))
     return literalE->getLoc();
+  if (auto *varE = std::get_if<VarE>(&expr))
+    return varE->getLoc();
   return {};
 }
 
@@ -97,8 +109,9 @@ inline SMLoc getLoc(const Expr &expr) {
 
 class ExprStmt;
 class PrintStmt;
+class VarStmt;
 
-using Stmt = std::variant<ExprStmt, PrintStmt>;
+using Stmt = std::variant<ExprStmt, PrintStmt, VarStmt>;
 using Program = SmallVector<uptr<Stmt>, 16u>;
 
 class ExprStmt : ASTBase<ExprStmt> {
@@ -119,6 +132,19 @@ public:
 
 private:
   uptr<Expr> expr;
+};
+
+class VarStmt : ASTBase<VarStmt> {
+public:
+  VarStmt(const SMLoc loc, Token *symbol, uptr<Expr> init)
+      : ASTBase(loc), symbol(symbol), init(std::move(init)) {}
+
+  [[nodiscard]] Token *getSymbol() const { return symbol; }
+  [[nodiscard]] Expr *getInit() const { return init.get(); }
+
+private:
+  Token *symbol;
+  uptr<Expr> init;
 };
 
 using AST = std::variant<Expr, Stmt>;

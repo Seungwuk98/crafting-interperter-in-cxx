@@ -6,11 +6,47 @@ namespace lox {
 Program Parser::Parse() {
   Program program;
   while (!isAtEnd())
-    program.emplace_back(Statement());
+    program.emplace_back(Declaration());
   return program;
 }
+uptr<Stmt> Parser::Declaration() {
+  uptr<Stmt> stmt;
+  if (match(Tok_var))
+    stmt = varDeclaration();
+  else
+    stmt = statement();
 
-uptr<Stmt> Parser::Statement() {
+  if (!stmt)
+    synchronize();
+  return stmt;
+}
+
+uptr<Stmt> Parser::varDeclaration() {
+  const auto loc = previous()->Loc;
+  if (peek()->Kind != (Tok_identifier)) {
+    report(peek()->Loc, SourceMgr::DK_Error,
+           formatv("Unexpected token. expected {0}, got {1}",
+                   getTokenName(Tok_identifier), getTokenName(peek()->Kind))
+               .str());
+    return nullptr;
+  }
+  auto *tok = advance();
+
+  uptr<Expr> expr;
+  if (match(Tok_equal))
+    expr = Expression();
+
+  if (!match(Tok_identifier)) {
+    report(peek()->Loc, SourceMgr::DK_Error,
+           formatv("Unexpected token. expected {0}, got {1}",
+                   getTokenName(Tok_semicolon), getTokenName(peek()->Kind))
+               .str());
+    return nullptr;
+  }
+  return mkptr<Stmt>(VarStmt(loc, tok, std::move(expr)));
+}
+
+uptr<Stmt> Parser::statement() {
   if (match(Tok_print))
     return printStmt();
   return exprStmt();
@@ -119,7 +155,8 @@ uptr<Expr> Parser::unary() {
 }
 
 uptr<Expr> Parser::primary() {
-  if (match(Tok_true, Tok_false, Tok_nil, Tok_number, Tok_string))
+  if (match(Tok_true, Tok_false, Tok_nil, Tok_number, Tok_string,
+            Tok_identifier))
     return mkptr<Expr>(LiteralE(previous()->Loc, previous()));
 
   if (match(Tok_lparen)) {

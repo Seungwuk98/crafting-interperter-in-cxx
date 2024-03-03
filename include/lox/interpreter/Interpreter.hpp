@@ -23,6 +23,7 @@ struct StmtInterpreter {
 
   bool operator()(const ExprStmt &exprStmt);
   bool operator()(const PrintStmt &printStmt);
+  bool operator()(const VarStmt &varStmt);
 
   [[nodiscard]] std::size_t getError() const;
 
@@ -39,6 +40,7 @@ struct ExprInterpreter {
   opt<uptr<Value>> operator()(const UnaryE &unaryE);
   opt<uptr<Value>> operator()(const GroupingE &groupingE);
   opt<uptr<Value>> operator()(const LiteralE &literalE);
+  opt<uptr<Value>> operator()(const VarE &varE);
 
   SourceMgr &SrcMgr;
 
