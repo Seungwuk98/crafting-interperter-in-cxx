@@ -3,6 +3,7 @@
 
 #include "lox/parser/Token.hpp"
 #include "utils/TypeUtils.hpp"
+#include "llvm/ADT/SmallVector.h"
 #include <variant>
 
 namespace lox {
@@ -16,10 +17,29 @@ class LiteralE;
 
 using Expr = std::variant<BinaryE, UnaryE, GroupingE, LiteralE>;
 
-class BinaryE {
+template <typename ConcreteType>
+class ASTBase {
 public:
-  BinaryE(uptr<Expr> lhs, uptr<Expr> rhs, Token *opKind)
-      : lhs(std::move(lhs)), rhs(std::move(rhs)), opKind(opKind) {}
+  ConcreteType &get() { return static_cast<ConcreteType &>(*this); }
+  [[nodiscard]] const ConcreteType &get() const {
+    return static_cast<const ConcreteType &>(*this);
+  }
+
+  [[nodiscard]] SMLoc getLoc() const { return loc; }
+
+protected:
+  explicit ASTBase(const SMLoc loc) : loc(loc) {}
+  ~ASTBase() = default;
+
+private:
+  SMLoc loc;
+};
+
+class BinaryE : public ASTBase<BinaryE> {
+public:
+  BinaryE(const SMLoc loc, uptr<Expr> lhs, uptr<Expr> rhs, Token *opKind)
+      : ASTBase(loc), lhs(std::move(lhs)), rhs(std::move(rhs)), opKind(opKind) {
+  }
   [[nodiscard]] Expr *getLhs() const { return lhs.get(); }
   [[nodiscard]] Expr *getRhs() const { return rhs.get(); }
   [[nodiscard]] Token *getOpKind() const { return opKind; }
@@ -30,10 +50,10 @@ private:
   Token *opKind;
 };
 
-class UnaryE {
+class UnaryE : public ASTBase<UnaryE> {
 public:
-  UnaryE(uptr<Expr> expr, Token *opKind)
-      : expr(std::move(expr)), opKind(opKind) {}
+  UnaryE(const SMLoc loc, uptr<Expr> expr, Token *opKind)
+      : ASTBase(loc), expr(std::move(expr)), opKind(opKind) {}
   [[nodiscard]] Expr *getExpr() const { return expr.get(); }
   [[nodiscard]] Token *getOpKind() const { return opKind; }
 
@@ -42,30 +62,64 @@ private:
   Token *opKind;
 };
 
-class GroupingE {
+class GroupingE : public ASTBase<GroupingE> {
 public:
-  explicit GroupingE(uptr<Expr> expr) : expr(std::move(expr)) {}
+  GroupingE(const SMLoc loc, uptr<Expr> expr)
+      : ASTBase(loc), expr(std::move(expr)) {}
   [[nodiscard]] Expr *getExpr() const { return expr.get(); }
 
 private:
   uptr<Expr> expr;
 };
 
-class LiteralE {
+class LiteralE : public ASTBase<LiteralE> {
 public:
-  explicit LiteralE(Token *value) : value(value) {}
+  LiteralE(const SMLoc loc, Token *value) : ASTBase(loc), value(value) {}
   [[nodiscard]] Token *getValue() const { return value; }
 
 private:
   Token *value;
 };
 
+inline SMLoc getLoc(const Expr &expr) {
+  if (auto *unaryE = std::get_if<UnaryE>(&expr))
+    return unaryE->getLoc();
+  if (auto *binaryE = std::get_if<BinaryE>(&expr))
+    return binaryE->getLoc();
+  if (auto *groupingE = std::get_if<GroupingE>(&expr))
+    return groupingE->getLoc();
+  if (auto *literalE = std::get_if<LiteralE>(&expr))
+    return literalE->getLoc();
+  return {};
+}
+
 ///==----------------------------- Statement ------------------------------==///
 
 class ExprStmt;
-class ClassStmt;
+class PrintStmt;
 
-using Stmt = std::variant<ExprStmt, ClassStmt>;
+using Stmt = std::variant<ExprStmt, PrintStmt>;
+using Program = SmallVector<uptr<Stmt>, 16u>;
+
+class ExprStmt : ASTBase<ExprStmt> {
+public:
+  ExprStmt(const SMLoc loc, uptr<Expr> expr)
+      : ASTBase(loc), expr(std::move(expr)) {}
+  [[nodiscard]] Expr *getExpr() const { return expr.get(); }
+
+private:
+  uptr<Expr> expr;
+};
+
+class PrintStmt : ASTBase<PrintStmt> {
+public:
+  PrintStmt(const SMLoc loc, uptr<Expr> expr)
+      : ASTBase(loc), expr(std::move(expr)) {}
+  [[nodiscard]] Expr *getExpr() const { return expr.get(); }
+
+private:
+  uptr<Expr> expr;
+};
 
 using AST = std::variant<Expr, Stmt>;
 

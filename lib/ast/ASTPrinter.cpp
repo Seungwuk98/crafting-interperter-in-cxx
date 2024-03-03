@@ -26,6 +26,21 @@ void ExprPrinter::operator()(const lox::LiteralE &literalE) {
     llvm_unreachable("In lox, there are only string and number literal");
 }
 
+void StmtPrinter::operator()(const ExprStmt &exprStmt) {
+  exprPrint(*exprStmt.getExpr());
+  ss << ";\n";
+}
+
+void StmtPrinter::operator()(const PrintStmt &printStmt) {
+  ss << "print ";
+  exprPrint(*printStmt.getExpr());
+  ss << ";\n";
+}
+
+void StmtPrinter::exprPrint(const Expr &expr) {
+  std::visit(ExprFormatter, expr);
+}
+
 void ExprPrinter::operator()(const lox::GroupingE &groupingE) {
   ss << '(';
   std::visit(*this, *groupingE.getExpr());

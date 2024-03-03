@@ -13,41 +13,64 @@ TEST_CASE("AST Print test") {
     auto tok = mkptr<Token>(SMLoc(), 0u, TokenKind::Tok_minus, "-");
     auto lhsTok = mkptr<Token>(SMLoc(), 0u, TokenKind::Tok_number, "12");
     auto rhsTok = mkptr<Token>(SMLoc(), 0u, TokenKind::Tok_number, "32");
-    Expr e = BinaryE(mkptr<Expr>(LiteralE{lhsTok.get()}),
-                     mkptr<Expr>(LiteralE{rhsTok.get()}), tok.get());
+    Expr e = BinaryE({}, mkptr<Expr>(LiteralE{{}, lhsTok.get()}),
+                     mkptr<Expr>(LiteralE{{}, rhsTok.get()}), tok.get());
 
-    ExprPrinter ep;
+    std::string result;
+    ExprPrinter ep(result);
     std::visit(ep, e);
-    auto result = ep.getResult();
     CHECK_EQ("(12 - 32)", result);
   }
 }
 
 TEST_CASE("Parse expr test") {
-  PARSER_TEST("plus test", R"(
+  EXPR_PARSE_TEST("plus test", R"(
 1 + 2
 )",
-              R"((1 + 2))");
+                  R"((1 + 2))");
 
-  PARSER_TEST("minus test", R"(
+  EXPR_PARSE_TEST("minus test", R"(
 1 - 2
 )",
-              R"((1 - 2))");
+                  R"((1 - 2))");
 
-  PARSER_TEST("multiply test", R"(
+  EXPR_PARSE_TEST("multiply test", R"(
 1 * 2
 )",
-              R"((1 * 2))");
+                  R"((1 * 2))");
 
-  PARSER_TEST("divide test", R"(
+  EXPR_PARSE_TEST("divide test", R"(
 1 / 2
 )",
-              R"((1 / 2))");
+                  R"((1 / 2))");
 
-  PARSER_TEST("complex precedence test", R"(
+  EXPR_PARSE_TEST(
+      "complex precedence test", R"(
 1 + 2 * 3 + 4 / 5 / ( 6 - 8 ) - (-9) + !10
 )",
-              R"(((((1 + (2 * 3)) + ((4 / 5) / ((6 - 8)))) - (-9)) + !10))");
+      R"(((((1 + (2 * 3)) + ((4 / 5) / ((6 - 8)))) - (-9)) + !10))");
+
+  EXPR_PARSE_TEST("string add", R"(
+"abcde" + "fgh"
+)",
+                  R"(("abcde" + "fgh"))");
+
+  PROGRAM_PARSE_TEST("print", R"(
+print "ABCDE";
+)",
+                     R"(print "ABCDE";
+)");
+
+  PROGRAM_PARSE_TEST("exprs",
+                     R"(
+1 + 2;
+2 + 3 + 4;
+print 1 + 2 * 3;
+)",
+                     R"((1 + 2);
+((2 + 3) + 4);
+print (1 + (2 * 3));
+)");
 }
 
 } // namespace lox

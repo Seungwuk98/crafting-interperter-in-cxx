@@ -17,10 +17,23 @@ public:
 
   SourceMgr &SrcMgr;
 
+  Program Parse();
+
+  /// Statement -> expression statement | print statement
+  uptr<Stmt> Statement();
+
   /// expression -> equality
   uptr<Expr> Expression();
 
+  [[nodiscard]] std::size_t getError() const { return errorNum; }
+
 private:
+  /// expression statement -> expression ';'
+  uptr<Stmt> exprStmt();
+
+  /// print statement -> "print" expr ';'
+  uptr<Stmt> printStmt();
+
   /// equality -> comparison ( ( "!=" | "==" ) comparison )*
   uptr<Expr> equality();
 

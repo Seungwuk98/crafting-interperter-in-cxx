@@ -39,14 +39,13 @@ inline bool runLexTest(const StringRef code, const StringRef expected) {
 #define LEX_TEST(test, code, expect)                                           \
   SUBCASE(test) CHECK(::lox::runLexTest(code, expect));
 
-inline bool runParseTest(const StringRef code, const StringRef expected) {
+inline bool runExprParseTest(const StringRef code, const StringRef expected) {
   auto bufferPtr = MemoryBuffer::getMemBuffer(code, "source");
   const auto &buffer = *bufferPtr;
   SourceMgr srcMgr;
   const auto id = srcMgr.AddNewSourceBuffer(std::move(bufferPtr), {});
   Lexer lexer(srcMgr, buffer.getBuffer());
-  const auto success = lexer.Lex();
-  if (!success)
+  if (const auto success = lexer.Lex(); !success)
     return false;
 
   Parser parser(lexer.getTokens(), srcMgr);
@@ -54,19 +53,50 @@ inline bool runParseTest(const StringRef code, const StringRef expected) {
   if (!expr)
     return false;
 
-  ExprPrinter exprPrinter;
+  std::string result;
+  ExprPrinter exprPrinter(result);
   std::visit(exprPrinter, *expr);
 
-  if (exprPrinter.getResult() != expected) {
-    FAIL(exprPrinter.getResult());
+  if (result != expected) {
+    FAIL(result);
     return false;
   }
 
   return true;
 }
 
-#define PARSER_TEST(test, code, expect)                                        \
-  SUBCASE(test) CHECK(::lox::runParseTest(code, expect));
+#define EXPR_PARSE_TEST(test, code, expect)                                    \
+  SUBCASE(test) CHECK(::lox::runExprParseTest(code, expect));
+
+inline bool runStmtParseTest(const StringRef code, const StringRef expected) {
+  auto bufferPtr = MemoryBuffer::getMemBuffer(code, "source");
+  const auto &buffer = *bufferPtr;
+  SourceMgr srcMgr;
+  const auto id = srcMgr.AddNewSourceBuffer(std::move(bufferPtr), {});
+  Lexer lexer(srcMgr, buffer.getBuffer());
+  if (const auto success = lexer.Lex(); !success)
+    return false;
+
+  Parser parser(lexer.getTokens(), srcMgr);
+  auto program = parser.Parse();
+  if (parser.getError())
+    return false;
+
+  std::string result;
+  StmtPrinter stmtPrinter(result);
+  for (const auto &stmt : program)
+    std::visit(stmtPrinter, *stmt);
+
+  if (result != expected) {
+    FAIL(result);
+    return false;
+  }
+
+  return true;
+}
+
+#define PROGRAM_PARSE_TEST(test, code, expect)                                 \
+  SUBCASE(test) CHECK(::lox::runStmtParseTest(code, expect));
 
 } // namespace lox
 

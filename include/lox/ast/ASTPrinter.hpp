@@ -17,8 +17,6 @@ struct PrinterBase {
   }
 
   void clear() { get().clear(); }
-
-  std::string getResult() const { return get().getResult(); }
 };
 
 class ExprPrinter;
@@ -32,7 +30,6 @@ struct ASTPrinter : PrinterBase<ASTPrinter> {
   void operator()(const Stmt &stmt);
 
   void clear();
-  std::string getResult() const { return result; }
 
 private:
   ExprPrinter &exprPrinter;
@@ -42,7 +39,7 @@ private:
 };
 
 struct ExprPrinter : PrinterBase<ExprPrinter> {
-  ExprPrinter() : ss(result) {}
+  explicit ExprPrinter(std::string &result) : ss(result) {}
 
   void operator()(const BinaryE &binaryE);
   void operator()(const UnaryE &unaryE);
@@ -50,21 +47,23 @@ struct ExprPrinter : PrinterBase<ExprPrinter> {
   void operator()(const LiteralE &literalE);
 
   void clear();
-  std::string getResult() const { return result; }
 
 private:
-  std::string result;
   raw_string_ostream ss;
 };
 
 struct StmtPrinter : PrinterBase<StmtPrinter> {
-  StmtPrinter() : ss(result) {}
+  explicit StmtPrinter(std::string &result)
+      : ExprFormatter(result), ss(result) {}
 
   void operator()(const ExprStmt &exprStmt);
-  void operator()(const ClassStmt &classStmt);
+  void operator()(const PrintStmt &classStmt);
 
   void clear();
-  std::string getResult() const { return result; }
+
+  void exprPrint(const Expr &expr);
+
+  ExprPrinter ExprFormatter;
 
 private:
   std::string result;

@@ -3,7 +3,40 @@
 
 namespace lox {
 
+Program Parser::Parse() {
+  Program program;
+  while (!isAtEnd())
+    program.emplace_back(Statement());
+  return program;
+}
+
+uptr<Stmt> Parser::Statement() {
+  if (match(Tok_print))
+    return printStmt();
+  return exprStmt();
+}
+
 uptr<Expr> Parser::Expression() { return equality(); }
+
+uptr<Stmt> Parser::exprStmt() {
+  auto expr = Expression();
+  if (!expr)
+    return nullptr;
+  const auto loc = getLoc(*expr);
+  if (!match(Tok_semicolon))
+    report(loc, SourceMgr::DK_Error, "Expect `;` after value.");
+  return mkptr<Stmt>(ExprStmt(loc, std::move(expr)));
+}
+
+uptr<Stmt> Parser::printStmt() {
+  auto expr = Expression();
+  if (!expr)
+    return nullptr;
+  const auto loc = getLoc(*expr);
+  if (!match(Tok_semicolon))
+    report(loc, SourceMgr::DK_Error, "Expect `;` after value.");
+  return mkptr<Stmt>(PrintStmt(loc, std::move(expr)));
+}
 
 uptr<Expr> Parser::equality() {
   auto expr = comparison();
@@ -11,11 +44,12 @@ uptr<Expr> Parser::equality() {
     return nullptr;
 
   while (match(Tok_bang_equal, Tok_equal_equal)) {
-    auto opKind = previous();
+    const auto opKind = previous();
     auto right = comparison();
     if (!right)
       return nullptr;
-    expr = mkptr<Expr>(BinaryE(std::move(expr), std::move(right), opKind));
+    expr = mkptr<Expr>(
+        BinaryE(opKind->Loc, std::move(expr), std::move(right), opKind));
   }
 
   return expr;
@@ -27,11 +61,12 @@ uptr<Expr> Parser::comparison() {
     return nullptr;
 
   while (match(Tok_gt, Tok_ge, Tok_lt, Tok_le)) {
-    auto opKind = previous();
+    const auto opKind = previous();
     auto right = term();
     if (!right)
       return nullptr;
-    expr = mkptr<Expr>(BinaryE(std::move(expr), std::move(right), opKind));
+    expr = mkptr<Expr>(
+        BinaryE(opKind->Loc, std::move(expr), std::move(right), opKind));
   }
 
   return expr;
@@ -43,11 +78,12 @@ uptr<Expr> Parser::term() {
     return nullptr;
 
   while (match(Tok_minus, Tok_plus)) {
-    auto opKind = previous();
+    const auto opKind = previous();
     auto right = factor();
     if (!right)
       return nullptr;
-    expr = mkptr<Expr>(BinaryE(std::move(expr), std::move(right), opKind));
+    expr = mkptr<Expr>(
+        BinaryE(opKind->Loc, std::move(expr), std::move(right), opKind));
   }
 
   return expr;
@@ -63,7 +99,8 @@ uptr<Expr> Parser::factor() {
     auto right = unary();
     if (!right)
       return nullptr;
-    expr = mkptr<Expr>(BinaryE(std::move(expr), std::move(right), opKind));
+    expr = mkptr<Expr>(
+        BinaryE(opKind->Loc, std::move(expr), std::move(right), opKind));
   }
 
   return expr;
@@ -71,11 +108,11 @@ uptr<Expr> Parser::factor() {
 
 uptr<Expr> Parser::unary() {
   if (match(Tok_bang, Tok_minus)) {
-    auto opKind = previous();
+    const auto opKind = previous();
     auto expr = unary();
     if (!expr)
       return nullptr;
-    return mkptr<Expr>(UnaryE(std::move(expr), opKind));
+    return mkptr<Expr>(UnaryE(opKind->Loc, std::move(expr), opKind));
   }
 
   return primary();
@@ -83,9 +120,10 @@ uptr<Expr> Parser::unary() {
 
 uptr<Expr> Parser::primary() {
   if (match(Tok_true, Tok_false, Tok_nil, Tok_number, Tok_string))
-    return mkptr<Expr>(LiteralE(previous()));
+    return mkptr<Expr>(LiteralE(previous()->Loc, previous()));
 
   if (match(Tok_lparen)) {
+    auto loc = previous()->Loc;
     auto expr = Expression();
     if (!match(Tok_rparen)) {
       report(peek()->Loc, SourceMgr::DK_Error,
@@ -94,7 +132,7 @@ uptr<Expr> Parser::primary() {
                  .str());
       return nullptr;
     }
-    return mkptr<Expr>(GroupingE(std::move(expr)));
+    return mkptr<Expr>(GroupingE(loc, std::move(expr)));
   }
   return nullptr;
 }

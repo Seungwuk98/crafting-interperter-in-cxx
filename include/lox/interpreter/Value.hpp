@@ -1,6 +1,7 @@
 #ifndef __LOX_VALUE_HPP__
 #define __LOX_VALUE_HPP__
 
+#include "utils/TypeUtils.hpp"
 #include "llvm/ADT/StringRef.h"
 #include <string>
 
@@ -30,7 +31,7 @@ private:
 
 class NumberValue : public Value {
 public:
-  explicit NumberValue(long double value) : Value(Number), value(value) {}
+  explicit NumberValue(const long double value) : Value(Number), value(value) {}
 
   [[nodiscard]] std::string str() const override;
   [[nodiscard]] bool truthy() const override;
@@ -46,7 +47,7 @@ private:
 
 class StringValue : public Value {
 public:
-  explicit StringValue(StringRef str) : Value(String), value(str.str()) {}
+  explicit StringValue(const StringRef str) : Value(String), value(str.str()) {}
 
   [[nodiscard]] std::string str() const override;
   [[nodiscard]] bool truthy() const override;
@@ -62,7 +63,7 @@ private:
 
 class BoolValue : public Value {
 public:
-  explicit BoolValue(bool value) : Value(Bool), value(value) {}
+  explicit BoolValue(const bool value) : Value(Bool), value(value) {}
   [[nodiscard]] std::string str() const override;
   [[nodiscard]] bool truthy() const override;
   [[nodiscard]] bool operator==(const Value &other) const override;
