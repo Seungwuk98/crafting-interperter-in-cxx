@@ -46,6 +46,7 @@ struct ExprPrinter : PrinterBase<ExprPrinter> {
   void operator()(const GroupingE &groupingE);
   void operator()(const LiteralE &literalE);
   void operator()(const VarE &varE);
+  void operator()(const AssignE &assignE);
 
   void clear();
 
@@ -59,6 +60,7 @@ struct StmtPrinter : PrinterBase<StmtPrinter> {
 
   void operator()(const ExprStmt &exprStmt);
   void operator()(const PrintStmt &classStmt);
+  void operator()(const VarStmt &varStmt);
 
   void clear();
 

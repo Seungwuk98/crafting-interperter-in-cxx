@@ -36,14 +36,14 @@ uptr<Stmt> Parser::varDeclaration() {
   if (match(Tok_equal))
     expr = Expression();
 
-  if (!match(Tok_identifier)) {
+  if (!match(Tok_semicolon)) {
     report(peek()->Loc, SourceMgr::DK_Error,
            formatv("Unexpected token. expected {0}, got {1}",
                    getTokenName(Tok_semicolon), getTokenName(peek()->Kind))
                .str());
     return nullptr;
   }
-  return mkptr<Stmt>(VarStmt(loc, tok, std::move(expr)));
+  return mkuptr<Stmt>(VarStmt(loc, tok, std::move(expr)));
 }
 
 uptr<Stmt> Parser::statement() {
@@ -52,7 +52,7 @@ uptr<Stmt> Parser::statement() {
   return exprStmt();
 }
 
-uptr<Expr> Parser::Expression() { return equality(); }
+uptr<Expr> Parser::Expression() { return assignment(); }
 
 uptr<Stmt> Parser::exprStmt() {
   auto expr = Expression();
@@ -61,7 +61,7 @@ uptr<Stmt> Parser::exprStmt() {
   const auto loc = getLoc(*expr);
   if (!match(Tok_semicolon))
     report(loc, SourceMgr::DK_Error, "Expect `;` after value.");
-  return mkptr<Stmt>(ExprStmt(loc, std::move(expr)));
+  return mkuptr<Stmt>(ExprStmt(loc, std::move(expr)));
 }
 
 uptr<Stmt> Parser::printStmt() {
@@ -71,7 +71,26 @@ uptr<Stmt> Parser::printStmt() {
   const auto loc = getLoc(*expr);
   if (!match(Tok_semicolon))
     report(loc, SourceMgr::DK_Error, "Expect `;` after value.");
-  return mkptr<Stmt>(PrintStmt(loc, std::move(expr)));
+  return mkuptr<Stmt>(PrintStmt(loc, std::move(expr)));
+}
+
+uptr<Expr> Parser::assignment() {
+  auto expr = equality();
+  if (!expr)
+    return nullptr;
+
+  if (match(Tok_equal)) {
+    const auto *equal = previous();
+    auto valueE = assignment();
+    if (!valueE)
+      return nullptr;
+
+    if (auto *varE = std::get_if<VarE>(expr.get())) {
+      const auto symbol = varE->getSymbol();
+      return mkuptr<Expr>(AssignE(equal->Loc, symbol, std::move(valueE)));
+    }
+  }
+  return expr;
 }
 
 uptr<Expr> Parser::equality() {
@@ -84,7 +103,7 @@ uptr<Expr> Parser::equality() {
     auto right = comparison();
     if (!right)
       return nullptr;
-    expr = mkptr<Expr>(
+    expr = mkuptr<Expr>(
         BinaryE(opKind->Loc, std::move(expr), std::move(right), opKind));
   }
 
@@ -101,7 +120,7 @@ uptr<Expr> Parser::comparison() {
     auto right = term();
     if (!right)
       return nullptr;
-    expr = mkptr<Expr>(
+    expr = mkuptr<Expr>(
         BinaryE(opKind->Loc, std::move(expr), std::move(right), opKind));
   }
 
@@ -118,7 +137,7 @@ uptr<Expr> Parser::term() {
     auto right = factor();
     if (!right)
       return nullptr;
-    expr = mkptr<Expr>(
+    expr = mkuptr<Expr>(
         BinaryE(opKind->Loc, std::move(expr), std::move(right), opKind));
   }
 
@@ -135,7 +154,7 @@ uptr<Expr> Parser::factor() {
     auto right = unary();
     if (!right)
       return nullptr;
-    expr = mkptr<Expr>(
+    expr = mkuptr<Expr>(
         BinaryE(opKind->Loc, std::move(expr), std::move(right), opKind));
   }
 
@@ -148,16 +167,17 @@ uptr<Expr> Parser::unary() {
     auto expr = unary();
     if (!expr)
       return nullptr;
-    return mkptr<Expr>(UnaryE(opKind->Loc, std::move(expr), opKind));
+    return mkuptr<Expr>(UnaryE(opKind->Loc, std::move(expr), opKind));
   }
 
   return primary();
 }
 
 uptr<Expr> Parser::primary() {
-  if (match(Tok_true, Tok_false, Tok_nil, Tok_number, Tok_string,
-            Tok_identifier))
-    return mkptr<Expr>(LiteralE(previous()->Loc, previous()));
+  if (match(Tok_true, Tok_false, Tok_nil, Tok_number, Tok_string))
+    return mkuptr<Expr>(LiteralE(previous()->Loc, previous()));
+  if (match(Tok_identifier))
+    return mkuptr<Expr>(VarE(previous()->Loc, previous()));
 
   if (match(Tok_lparen)) {
     auto loc = previous()->Loc;
@@ -169,7 +189,7 @@ uptr<Expr> Parser::primary() {
                  .str());
       return nullptr;
     }
-    return mkptr<Expr>(GroupingE(loc, std::move(expr)));
+    return mkuptr<Expr>(GroupingE(loc, std::move(expr)));
   }
   return nullptr;
 }

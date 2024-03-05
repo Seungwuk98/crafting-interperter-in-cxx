@@ -1,25 +1,30 @@
-#ifndef __LOX_INTERPRETER_HPP__
-#define __LOX_INTERPRETER_HPP__
+#ifndef LOW_INTERPRETER_HPP
+#define LOW_INTERPRETER_HPP
 
 #include "lox/ast/AST.hpp"
 #include "lox/interpreter/Value.hpp"
 #include "utils/TypeUtils.hpp"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/ScopedHashTable.h"
 
 namespace lox {
 
 struct ExprInterpreter;
 
+using LoxValueEnv = ScopedHashTable<StringRef, sptr<Value>>;
+using LoxValueScope = LoxValueEnv::ScopeTy;
+
 struct StmtInterpreter {
   explicit StmtInterpreter(SourceMgr &srcMgr, ExprInterpreter &exprInterpreter,
-                           raw_ostream &os = llvm::errs())
-      : SrcMgr(srcMgr), ExprEvaluator(exprInterpreter), os(os), error(0u) {}
+                           LoxValueEnv &env, raw_ostream &os = llvm::errs())
+      : SrcMgr(srcMgr), ExprEvaluator(exprInterpreter), env(env), os(os),
+        error(0u) {}
 
   SourceMgr &SrcMgr;
   ExprInterpreter &ExprEvaluator;
 
-  opt<uptr<Value>> Evaluate(const Expr &expr) const;
+  [[nodiscard]] sptr<Value> Evaluate(const Expr &expr) const;
 
   bool operator()(const ExprStmt &exprStmt);
   bool operator()(const PrintStmt &printStmt);
@@ -28,19 +33,22 @@ struct StmtInterpreter {
   [[nodiscard]] std::size_t getError() const;
 
 private:
+  LoxValueEnv &env;
   /// redirect of print
   raw_ostream &os;
   std::size_t error;
 };
 
 struct ExprInterpreter {
-  explicit ExprInterpreter(SourceMgr &srcMgr) : SrcMgr(srcMgr), error(0u) {}
+  explicit ExprInterpreter(SourceMgr &srcMgr, LoxValueEnv &env)
+      : SrcMgr(srcMgr), error(0u), env(env) {}
 
-  opt<uptr<Value>> operator()(const BinaryE &binaryE);
-  opt<uptr<Value>> operator()(const UnaryE &unaryE);
-  opt<uptr<Value>> operator()(const GroupingE &groupingE);
-  opt<uptr<Value>> operator()(const LiteralE &literalE);
-  opt<uptr<Value>> operator()(const VarE &varE);
+  sptr<Value> operator()(const BinaryE &binaryE);
+  sptr<Value> operator()(const UnaryE &unaryE);
+  sptr<Value> operator()(const GroupingE &groupingE);
+  sptr<Value> operator()(const LiteralE &literalE);
+  sptr<Value> operator()(const VarE &varE);
+  sptr<Value> operator()(const AssignE &assignE);
 
   SourceMgr &SrcMgr;
 
@@ -51,8 +59,9 @@ private:
               raw_ostream &os = llvm::errs());
 
   std::size_t error;
+  LoxValueEnv &env;
 };
 
 } // namespace lox
 
-#endif /// __LOX_INTERPRETER_HPP__
+#endif /// LOW_INTERPRETER_HPP

@@ -23,7 +23,7 @@ public:
   /// declaration -> varDecl | statement
   uptr<Stmt> Declaration();
 
-  /// expression -> equality
+  /// expression -> assignment
   uptr<Expr> Expression();
 
   [[nodiscard]] std::size_t getError() const { return errorNum; }
@@ -40,6 +40,9 @@ private:
 
   /// print statement -> "print" expr ';'
   uptr<Stmt> printStmt();
+
+  /// assignment -> IDENTIFIER "=" expression | equality
+  uptr<Expr> assignment();
 
   /// equality -> comparison ( ( "!=" | "==" ) comparison )*
   uptr<Expr> equality();

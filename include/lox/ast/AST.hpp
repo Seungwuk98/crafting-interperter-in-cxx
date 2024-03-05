@@ -15,8 +15,9 @@ class UnaryE;
 class GroupingE;
 class LiteralE;
 class VarE;
+class AssignE;
 
-using Expr = std::variant<BinaryE, UnaryE, GroupingE, LiteralE, VarE>;
+using Expr = std::variant<BinaryE, UnaryE, GroupingE, LiteralE, VarE, AssignE>;
 
 template <typename ConcreteType>
 class ASTBase {
@@ -89,6 +90,19 @@ public:
 
 private:
   Token *symbol;
+};
+
+class AssignE : public ASTBase<AssignE> {
+public:
+  AssignE(const SMLoc loc, Token *symbol, uptr<Expr> value)
+      : ASTBase(loc), symbol(symbol), value(std::move(value)) {}
+
+  [[nodiscard]] Token *getSymbol() const { return symbol; }
+  [[nodiscard]] Expr *getValue() const { return value.get(); }
+
+private:
+  Token *symbol;
+  uptr<Expr> value;
 };
 
 inline SMLoc getLoc(const Expr &expr) {

@@ -30,6 +30,20 @@ print "!";
 world
 !
 )");
+
+  PRINT_OUTPUT_TEST("print variable expression", R"(
+var a = 10;
+print a;
+)",
+                    R"(10.000000
+)");
+
+  PRINT_OUTPUT_TEST("print variable and assign expression", R"(
+var a = 10;
+a = a + 10;
+print a;
+)", R"(20.000000
+)");
 }
 
 } // namespace lox

@@ -26,14 +26,14 @@ inline bool runInterpreterTest(StringRef code, const Value &value) {
   if (!expr)
     return false;
 
-  ExprInterpreter exprInterpreter(srcMgr);
+  LoxValueEnv Env;
+  ExprInterpreter exprInterpreter(srcMgr, Env);
   auto result = std::visit(exprInterpreter, *expr);
   if (exprInterpreter.getError())
     return false;
 
-  if (!(**result == value)) {
-    FAIL(llvm::formatv("expected : {0}, got : {1}", value.str(),
-                       (*result)->str())
+  if (!(*result == value)) {
+    FAIL(llvm::formatv("expected : {0}, got : {1}", value.str(), result->str())
              .str());
     return false;
   }
@@ -61,10 +61,14 @@ inline bool runPrintInterpretTest(const StringRef code,
 
   std::string result;
   raw_string_ostream ss(result);
-  ExprInterpreter exprInterpreter(srcMgr);
-  StmtInterpreter stmtInterpreter(srcMgr, exprInterpreter, ss);
-  for (const auto &stmt : program)
-    std::visit(stmtInterpreter, *stmt);
+  LoxValueEnv Env;
+  ExprInterpreter exprInterpreter(srcMgr, Env);
+  StmtInterpreter stmtInterpreter(srcMgr, exprInterpreter, Env, ss);
+  {
+    LoxValueScope globalScope(Env);
+    for (const auto &stmt : program)
+      std::visit(stmtInterpreter, *stmt);
+  }
 
   if (stmtInterpreter.getError())
     return false;

@@ -30,6 +30,12 @@ void ExprPrinter::operator()(const VarE &varE) {
   ss << varE.getSymbol()->Symbol;
 }
 
+void ExprPrinter::operator()(const AssignE &assignE) {
+  ss << "(" << assignE.getSymbol()->Symbol << " = ";
+  std::visit(*this, *assignE.getValue());
+  ss << ")";
+}
+
 void StmtPrinter::operator()(const ExprStmt &exprStmt) {
   exprPrint(*exprStmt.getExpr());
   ss << ";\n";
@@ -38,6 +44,14 @@ void StmtPrinter::operator()(const ExprStmt &exprStmt) {
 void StmtPrinter::operator()(const PrintStmt &printStmt) {
   ss << "print ";
   exprPrint(*printStmt.getExpr());
+  ss << ";\n";
+}
+void StmtPrinter::operator()(const VarStmt &varStmt) {
+  ss << "var " << varStmt.getSymbol()->Symbol;
+  if (varStmt.getInit()) {
+    ss << " = ";
+    std::visit(ExprFormatter, *varStmt.getInit());
+  }
   ss << ";\n";
 }
 

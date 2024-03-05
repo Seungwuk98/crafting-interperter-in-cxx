@@ -2,14 +2,14 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 
-#define CheckNumberOperand(loc, value)                                         \
-  {}
+#include <llvm/Support/FormatVariadic.h>
 
 namespace lox {
 
-opt<uptr<Value>> StmtInterpreter::Evaluate(const Expr &expr) const {
+sptr<Value> StmtInterpreter::Evaluate(const Expr &expr) const {
   return std::visit(ExprEvaluator, expr);
 }
+
 bool StmtInterpreter::operator()(const ExprStmt &exprStmt) {
   if (Evaluate(*exprStmt.getExpr()))
     return false;
@@ -17,38 +17,43 @@ bool StmtInterpreter::operator()(const ExprStmt &exprStmt) {
 }
 
 bool StmtInterpreter::operator()(const PrintStmt &printStmt) {
-  const auto exprResultOpt = Evaluate(*printStmt.getExpr());
-  if (!exprResultOpt)
+  const auto exprValuePtr = Evaluate(*printStmt.getExpr());
+  if (!exprValuePtr)
     return false;
-  os << exprResultOpt.value()->str() << '\n';
+  os << exprValuePtr->str() << '\n';
   return true;
 }
 
 bool StmtInterpreter::operator()(const VarStmt &varStmt) {
-  /// TODO
-  return false;
+  sptr<Value> init;
+  if (varStmt.getInit()) {
+    init = std::visit(ExprEvaluator, *varStmt.getInit());
+    if (!init)
+      return false;
+  }
+
+  env.insert(varStmt.getSymbol()->Symbol, init);
+  return true;
 }
 
 std::size_t StmtInterpreter::getError() const {
   return error + ExprEvaluator.getError();
 }
 
-opt<uptr<Value>> ExprInterpreter::operator()(const BinaryE &binaryE) {
-  const auto lhsVOpt = std::visit(*this, *binaryE.getLhs());
-  if (!lhsVOpt)
-    return {};
-  const auto rhsVOpt = std::visit(*this, *binaryE.getRhs());
-  if (!rhsVOpt)
-    return {};
+sptr<Value> ExprInterpreter::operator()(const BinaryE &binaryE) {
+  const auto lhsVPtr = std::visit(*this, *binaryE.getLhs());
+  const auto rhsVPtr = std::visit(*this, *binaryE.getRhs());
+  if (!lhsVPtr || !rhsVPtr)
+    return nullptr;
 
-  const auto *lhsV = lhsVOpt->get();
-  const auto *rhsV = rhsVOpt->get();
+  const auto lhsV = lhsVPtr.get();
+  const auto rhsV = rhsVPtr.get();
 
   switch (const auto *opKind = binaryE.getOpKind(); opKind->Kind) {
   case Tok_minus:
     if (NumberValue::classof(lhsV) && NumberValue::classof(rhsV)) {
-      return mkptr<NumberValue>(llvm::cast<NumberValue>(lhsV)->getValue() -
-                                llvm::cast<NumberValue>(rhsV)->getValue());
+      return mkuptr<NumberValue>(llvm::cast<NumberValue>(lhsV)->getValue() -
+                                 llvm::cast<NumberValue>(rhsV)->getValue());
     } else {
       report(binaryE.getLoc(), SourceMgr::DK_Error,
              "Operands must be a number");
@@ -56,11 +61,11 @@ opt<uptr<Value>> ExprInterpreter::operator()(const BinaryE &binaryE) {
     }
   case Tok_plus:
     if (NumberValue::classof(lhsV) && NumberValue::classof(rhsV)) {
-      return mkptr<NumberValue>(llvm::cast<NumberValue>(lhsV)->getValue() +
-                                llvm::cast<NumberValue>(rhsV)->getValue());
+      return mkuptr<NumberValue>(llvm::cast<NumberValue>(lhsV)->getValue() +
+                                 llvm::cast<NumberValue>(rhsV)->getValue());
     } else if (StringValue::classof(lhsV) && StringValue::classof(rhsV)) {
-      return mkptr<StringValue>(llvm::cast<StringValue>(lhsV)->getValue() +
-                                llvm::cast<StringValue>(rhsV)->getValue());
+      return mkuptr<StringValue>(llvm::cast<StringValue>(lhsV)->getValue() +
+                                 llvm::cast<StringValue>(rhsV)->getValue());
     } else {
       report(binaryE.getLoc(), SourceMgr::DK_Error,
              "Operands must be a number or string");
@@ -68,8 +73,8 @@ opt<uptr<Value>> ExprInterpreter::operator()(const BinaryE &binaryE) {
     }
   case Tok_slash:
     if (NumberValue::classof(lhsV) && NumberValue::classof(rhsV)) {
-      return mkptr<NumberValue>(llvm::cast<NumberValue>(lhsV)->getValue() /
-                                llvm::cast<NumberValue>(rhsV)->getValue());
+      return mkuptr<NumberValue>(llvm::cast<NumberValue>(lhsV)->getValue() /
+                                 llvm::cast<NumberValue>(rhsV)->getValue());
     } else {
       report(binaryE.getLoc(), SourceMgr::DK_Error,
              "Operands must be a number");
@@ -77,8 +82,8 @@ opt<uptr<Value>> ExprInterpreter::operator()(const BinaryE &binaryE) {
     }
   case Tok_star:
     if (NumberValue::classof(lhsV) && NumberValue::classof(rhsV)) {
-      return mkptr<NumberValue>(llvm::cast<NumberValue>(lhsV)->getValue() *
-                                llvm::cast<NumberValue>(rhsV)->getValue());
+      return mkuptr<NumberValue>(llvm::cast<NumberValue>(lhsV)->getValue() *
+                                 llvm::cast<NumberValue>(rhsV)->getValue());
     } else {
       report(binaryE.getLoc(), SourceMgr::DK_Error,
              "Operands must be a number");
@@ -86,8 +91,8 @@ opt<uptr<Value>> ExprInterpreter::operator()(const BinaryE &binaryE) {
     }
   case Tok_ge:
     if (NumberValue::classof(lhsV) && NumberValue::classof(rhsV)) {
-      return mkptr<BoolValue>(llvm::cast<NumberValue>(lhsV)->getValue() >=
-                              llvm::cast<NumberValue>(rhsV)->getValue());
+      return mkuptr<BoolValue>(llvm::cast<NumberValue>(lhsV)->getValue() >=
+                               llvm::cast<NumberValue>(rhsV)->getValue());
     } else {
       report(binaryE.getLoc(), SourceMgr::DK_Error,
              "Operands must be a number");
@@ -95,8 +100,8 @@ opt<uptr<Value>> ExprInterpreter::operator()(const BinaryE &binaryE) {
     }
   case Tok_gt:
     if (NumberValue::classof(lhsV) && NumberValue::classof(rhsV)) {
-      return mkptr<BoolValue>(llvm::cast<NumberValue>(lhsV)->getValue() >
-                              llvm::cast<NumberValue>(rhsV)->getValue());
+      return mkuptr<BoolValue>(llvm::cast<NumberValue>(lhsV)->getValue() >
+                               llvm::cast<NumberValue>(rhsV)->getValue());
     } else {
       report(binaryE.getLoc(), SourceMgr::DK_Error,
              "Operands must be a number");
@@ -104,8 +109,8 @@ opt<uptr<Value>> ExprInterpreter::operator()(const BinaryE &binaryE) {
     }
   case Tok_le:
     if (NumberValue::classof(lhsV) && NumberValue::classof(rhsV)) {
-      return mkptr<BoolValue>(llvm::cast<NumberValue>(lhsV)->getValue() <=
-                              llvm::cast<NumberValue>(rhsV)->getValue());
+      return mkuptr<BoolValue>(llvm::cast<NumberValue>(lhsV)->getValue() <=
+                               llvm::cast<NumberValue>(rhsV)->getValue());
     } else {
       report(binaryE.getLoc(), SourceMgr::DK_Error,
              "Operands must be a number");
@@ -113,33 +118,33 @@ opt<uptr<Value>> ExprInterpreter::operator()(const BinaryE &binaryE) {
     }
   case Tok_lt:
     if (NumberValue::classof(lhsV) && NumberValue::classof(rhsV)) {
-      return mkptr<BoolValue>(llvm::cast<NumberValue>(lhsV)->getValue() <
-                              llvm::cast<NumberValue>(rhsV)->getValue());
+      return mkuptr<BoolValue>(llvm::cast<NumberValue>(lhsV)->getValue() <
+                               llvm::cast<NumberValue>(rhsV)->getValue());
     } else {
       report(binaryE.getLoc(), SourceMgr::DK_Error,
              "Operands must be a number");
       return {};
     }
   case Tok_equal_equal:
-    return mkptr<BoolValue>(*lhsV == *rhsV);
+    return mkuptr<BoolValue>(*lhsV == *rhsV);
   case Tok_bang_equal:
-    return mkptr<BoolValue>(!(*lhsV == *rhsV));
+    return mkuptr<BoolValue>(!(*lhsV == *rhsV));
 
   default:
     llvm_unreachable("runtime error");
   }
 }
 
-opt<uptr<Value>> ExprInterpreter::operator()(const UnaryE &unaryE) {
-  const auto targetVOpt = std::visit(*this, *unaryE.getExpr());
-  if (!targetVOpt)
-    return {};
-  const auto *targetV = targetVOpt->get();
+sptr<Value> ExprInterpreter::operator()(const UnaryE &unaryE) {
+  const auto targetVPtr = std::visit(*this, *unaryE.getExpr());
+  if (!targetVPtr)
+    return nullptr;
+  const auto *targetV = targetVPtr.get();
 
   switch (unaryE.getOpKind()->Kind) {
   case Tok_minus: {
     if (const auto *numberV = llvm::dyn_cast<NumberValue>(targetV))
-      return mkptr<NumberValue>(-numberV->getValue());
+      return mkuptr<NumberValue>(-numberV->getValue());
     else {
       report(unaryE.getLoc(), SourceMgr::DK_Error, "Operand must be a number");
       return {};
@@ -147,36 +152,57 @@ opt<uptr<Value>> ExprInterpreter::operator()(const UnaryE &unaryE) {
   }
   case Tok_bang: {
     const auto truthy = targetV->truthy();
-    return mkptr<BoolValue>(!truthy);
+    return mkuptr<BoolValue>(!truthy);
   }
   default:
     llvm_unreachable("all types of unary expression was handled");
   }
 }
 
-opt<uptr<Value>> ExprInterpreter::operator()(const GroupingE &groupingE) {
+sptr<Value> ExprInterpreter::operator()(const GroupingE &groupingE) {
   return std::visit(*this, *groupingE.getExpr());
 }
 
-opt<uptr<Value>> ExprInterpreter::operator()(const LiteralE &literalE) {
+sptr<Value> ExprInterpreter::operator()(const LiteralE &literalE) {
   switch (const auto *tok = literalE.getValue(); tok->Kind) {
   case Tok_number:
-    return mkptr<NumberValue>(std::stold(tok->Symbol.str()));
+    return mkuptr<NumberValue>(std::stold(tok->Symbol.str()));
   case Tok_string:
-    return mkptr<StringValue>(tok->Symbol.str());
+    return mkuptr<StringValue>(tok->Symbol.str());
   case Tok_true:
-    return mkptr<BoolValue>(true);
+    return mkuptr<BoolValue>(true);
   case Tok_false:
-    return mkptr<BoolValue>(false);
+    return mkuptr<BoolValue>(false);
   case Tok_nil:
-    return mkptr<NilValue>();
+    return mkuptr<NilValue>();
   default:
-    llvm_unreachable("All of literal is handled");
+    llvm::errs() << getTokenName(tok->Kind) << '\n';
+    llvm_unreachable("All of literal types are handled");
   }
 }
 
-opt<uptr<Value>> ExprInterpreter::operator()(const VarE &varE) {
-  return {}; /// TODO
+sptr<Value> ExprInterpreter::operator()(const VarE &varE) {
+  auto symbol = varE.getSymbol()->Symbol;
+  if (!env.count(symbol)) {
+    report(varE.getLoc(), SourceMgr::DK_Error,
+           formatv("Undefined variable : {0}", symbol).str());
+    return nullptr;
+  }
+  return env.lookup(symbol);
+}
+
+sptr<Value> ExprInterpreter::operator()(const AssignE &assignE) {
+  auto symbol = assignE.getSymbol();
+  if (!env.count(symbol->Symbol)) {
+    report(symbol->Loc, SourceMgr::DK_Error,
+           formatv("Undefined variable : {0}", symbol).str());
+    return nullptr;
+  }
+  const auto value = std::visit(*this, *assignE.getValue());
+  if (!value)
+    return nullptr;
+  env.insert(symbol->Symbol, value);
+  return value;
 }
 
 void ExprInterpreter::report(const SMLoc loc, const SourceMgr::DiagKind kind,

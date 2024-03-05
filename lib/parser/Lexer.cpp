@@ -20,7 +20,7 @@ bool Lexer::Lex() {
 #define RETURN_TOKEN(kind)                                                     \
   {                                                                            \
     Token tok{loc, tokens.size(), kind, buffer.slice(curr, cursor)};           \
-    tokens.emplace_back(mkptr<Token>(tok));                                    \
+    tokens.emplace_back(mkuptr<Token>(tok));                                   \
     return tok;                                                                \
   }
 Token Lexer::addNextToken() {
@@ -102,7 +102,7 @@ lex:
       RETURN_TOKEN(Tok_lt);
   case CharEof: {
     Token tok{loc, tokens.size(), Tok_eof, ""};
-    tokens.emplace_back(mkptr<Token>(tok));
+    tokens.emplace_back(mkuptr<Token>(tok));
     return tok;
   }
   case '"': {
@@ -120,7 +120,7 @@ lex:
     auto end = cursor;
     skip();
     Token tok{loc, tokens.size(), Tok_string, buffer.slice(start, end)};
-    tokens.emplace_back(mkptr<Token>(tok));
+    tokens.emplace_back(mkuptr<Token>(tok));
     return tok;
   }
   default:
@@ -170,7 +170,7 @@ lex:
 
                       .Default(Tok_identifier);
       Token tok{loc, tokens.size(), kind, symbol};
-      tokens.emplace_back(mkptr<Token>(tok));
+      tokens.emplace_back(mkuptr<Token>(tok));
       return tok;
     }
     skip();

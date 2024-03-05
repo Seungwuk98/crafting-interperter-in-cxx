@@ -10,11 +10,11 @@ namespace lox {
 
 TEST_CASE("AST Print test") {
   SUBCASE("binary expr print") {
-    auto tok = mkptr<Token>(SMLoc(), 0u, TokenKind::Tok_minus, "-");
-    auto lhsTok = mkptr<Token>(SMLoc(), 0u, TokenKind::Tok_number, "12");
-    auto rhsTok = mkptr<Token>(SMLoc(), 0u, TokenKind::Tok_number, "32");
-    Expr e = BinaryE({}, mkptr<Expr>(LiteralE{{}, lhsTok.get()}),
-                     mkptr<Expr>(LiteralE{{}, rhsTok.get()}), tok.get());
+    auto tok = mkuptr<Token>(SMLoc(), 0u, TokenKind::Tok_minus, "-");
+    auto lhsTok = mkuptr<Token>(SMLoc(), 0u, TokenKind::Tok_number, "12");
+    auto rhsTok = mkuptr<Token>(SMLoc(), 0u, TokenKind::Tok_number, "32");
+    Expr e = BinaryE({}, mkuptr<Expr>(LiteralE{{}, lhsTok.get()}),
+                     mkuptr<Expr>(LiteralE{{}, rhsTok.get()}), tok.get());
 
     std::string result;
     ExprPrinter ep(result);
@@ -70,6 +70,14 @@ print 1 + 2 * 3;
                      R"((1 + 2);
 ((2 + 3) + 4);
 print (1 + (2 * 3));
+)");
+
+  PROGRAM_PARSE_TEST("var", R"(
+var a = 10;
+print a;
+)",
+                     R"(var a = 10;
+print a;
 )");
 }
 
